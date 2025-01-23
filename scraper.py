@@ -6,9 +6,6 @@ import time
 import json
 import pandas as pd
 
-# Use the extracted access token
-ACCESS_TOKEN = "20241223l8341c1kjjish4povs28u7jn0t"  # Replace this with your actual access_token
-
 def fetch_sold_listings(url):
     options = webdriver.ChromeOptions()
 
@@ -27,20 +24,27 @@ def fetch_sold_listings(url):
     input("Press Enter after verifying that you are logged in...")
     time.sleep(20)  # Wait for the page to load
 
-    # Reload the page to apply the token
-    driver.get(url)
-    print("Reloaded the url, waiting for the page to load")
+    url_template = url.replace("page=1", "page={}")
 
-    time.sleep(15)  # Wait for the page to load
+    for page in range(1, 3):
 
-    html = driver.page_source
-    with open("logged_in_page_source.html", "w", encoding="utf-8") as f:
-        f.write(html)
+        paginated_url = url_template.format(page)
+        print(f"Scraping: {paginated_url}")
 
-    print("Logged-in page source saved.")
+        # Reload the page to apply the token
+        driver.get(paginated_url)
+        print("Reloaded the url, waiting for the page to load")
+
+        time.sleep(10)  # Wait for the page to load
+
+        html_filename = f"housesigma_page_{page}.html"
+        html = driver.page_source
+        with open(html_filename, "w", encoding="utf-8") as f:
+            f.write(html)
+
+        print(f"✅ Saved HTML: {html_filename}")
     driver.quit()
-    
-    return []
+    print("✅ Scraping completed.")
 
 def get_listing_details(input_html_filename):
     # Load the saved HTML file
