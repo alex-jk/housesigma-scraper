@@ -1,10 +1,39 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import time
 import json
 import pandas as pd
+
+def debug_pagination(url):
+    options = webdriver.ChromeOptions()
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+    print("Opening HouseSigma...")
+    driver.get("https://housesigma.com")
+
+    input("🔹 Press Enter after verifying that you are logged in...")  
+    time.sleep(10)  
+
+    driver.get(url)
+    time.sleep(5)  
+
+    # Save full HTML for inspection
+    html_filename = "full_page_source.html"
+    with open(html_filename, "w", encoding="utf-8") as f:
+        f.write(driver.page_source)
+
+    print(f"✅ Saved full page HTML: {html_filename}")
+    
+    driver.quit()
 
 def fetch_sold_listings(url):
     options = webdriver.ChromeOptions()
@@ -22,7 +51,42 @@ def fetch_sold_listings(url):
     driver.get("https://housesigma.com")
 
     input("Press Enter after verifying that you are logged in...")
-    time.sleep(20)  # Wait for the page to load
+    time.sleep(15)  # Wait for the page to load
+
+    # Load the first page
+    driver.get(url)
+    time.sleep(5)
+
+    # **Wait for pagination elements to load**
+    try:
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.XPATH, "//nav | //ul | //div[contains(@class, 'pagination')]"))
+        )
+        print("✅ Pagination detected.")
+    except:
+        print("⚠ Pagination not found immediately. Proceeding with available data.")
+
+    # Extract total number of pages from pagination
+    soup = BeautifulSoup(driver.page_source, "html.parser")
+
+    # **Find all possible pagination containers**
+    pagination_container = soup.find("nav") or soup.find("ul") or soup.find("div", class_="pagination")
+
+    if pagination_container:
+        print("🔍 Pagination HTML structure detected:")
+        print(pagination_container.prettify())  # Print the full HTML of pagination
+    else:
+        print("⚠ No pagination container found.")
+
+    page_numbers = []
+    if pagination_container:
+        for link in pagination_container.find_all("a"):
+            if link.text.strip().isdigit():
+                page_numbers.append(int(link.text.strip()))
+
+    max_page = max(page_numbers) if page_numbers else 1  # Get the highest page number
+
+    print(f"🔹 Total number of pages detected: {max_page}")
 
     url_template = url.replace("page=1", "page={}")
 
