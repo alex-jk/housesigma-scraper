@@ -1,11 +1,9 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 import time
+import re
 import json
 import pandas as pd
 
@@ -21,18 +19,21 @@ def debug_pagination(url):
     driver.get("https://housesigma.com")
 
     input("🔹 Press Enter after verifying that you are logged in...")  
-    time.sleep(10)  
+    time.sleep(5)
 
     driver.get(url)
-    time.sleep(5)  
+
+    time.sleep(5)  # Additional wait to ensure JavaScript has fully loaded
 
     # Save full HTML for inspection
     html_filename = "full_page_source.html"
+    page_source = driver.page_source  # Get the full HTML as a string
+
     with open(html_filename, "w", encoding="utf-8") as f:
-        f.write(driver.page_source)
+        f.write(page_source)
 
     print(f"✅ Saved full page HTML: {html_filename}")
-    
+
     driver.quit()
 
 def fetch_sold_listings(url):
@@ -57,36 +58,8 @@ def fetch_sold_listings(url):
     driver.get(url)
     time.sleep(5)
 
-    # **Wait for pagination elements to load**
-    try:
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.XPATH, "//nav | //ul | //div[contains(@class, 'pagination')]"))
-        )
-        print("✅ Pagination detected.")
-    except:
-        print("⚠ Pagination not found immediately. Proceeding with available data.")
-
     # Extract total number of pages from pagination
     soup = BeautifulSoup(driver.page_source, "html.parser")
-
-    # **Find all possible pagination containers**
-    pagination_container = soup.find("nav") or soup.find("ul") or soup.find("div", class_="pagination")
-
-    if pagination_container:
-        print("🔍 Pagination HTML structure detected:")
-        print(pagination_container.prettify())  # Print the full HTML of pagination
-    else:
-        print("⚠ No pagination container found.")
-
-    page_numbers = []
-    if pagination_container:
-        for link in pagination_container.find_all("a"):
-            if link.text.strip().isdigit():
-                page_numbers.append(int(link.text.strip()))
-
-    max_page = max(page_numbers) if page_numbers else 1  # Get the highest page number
-
-    print(f"🔹 Total number of pages detected: {max_page}")
 
     url_template = url.replace("page=1", "page={}")
 
