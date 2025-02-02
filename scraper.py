@@ -33,7 +33,7 @@ def debug_pagination(url):
     with open(html_filename, "w", encoding="utf-8") as f:
         f.write(page_source)
 
-    print(f"✅ Saved full page HTML: {html_filename}")
+    print(f"\n✅ Saved full page HTML: {html_filename}")
 
     driver.quit()
 
@@ -85,9 +85,9 @@ def get_listing_details(input_html_filename):
                 if len(text_parts) > 1:
                     bathroom_count = text_parts[1].strip()
         
-        # Extract postal code from JSON in <script> tag
+        # Extract postal code for each specific listing
         postal_code = "N/A"
-        script_tag = soup.find("script", class_="hs-script-home-struct")
+        script_tag = listing.find_next("script", class_="hs-script-home-struct")
 
         if script_tag:
             try:
@@ -104,7 +104,8 @@ def get_listing_details(input_html_filename):
             "Address": address,
             "Unit Type": type_text,
             "Bedrooms": bedroom_count,
-            "Bathrooms": bathroom_count
+            "Bathrooms": bathroom_count,
+            "Postal Code": postal_code
         })
 
     # Convert data to DataFrame
@@ -125,7 +126,7 @@ def fetch_sold_listings(url, num_pages=3):
     driver.get(url)
 
     input("Press Enter after verifying that you are logged in...")
-    time.sleep(15)  # Wait for the page to load
+    time.sleep(10)  # Wait for the page to load
 
     # Extract total number of pages from pagination
     soup = BeautifulSoup(driver.page_source, "html.parser")
@@ -163,3 +164,6 @@ def fetch_sold_listings(url, num_pages=3):
     # Combine all DataFrames into a single DataFrame
     combined_df = pd.concat(all_pages_df, ignore_index=True)
     return combined_df
+
+def clean_price(price):
+    return float(str(price).replace('$', '').replace(',', ''))
