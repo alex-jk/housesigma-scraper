@@ -173,3 +173,4 @@ cython_debug/
 # html files
 full_page_source.html
 housesigma_page_*.html
+*.png

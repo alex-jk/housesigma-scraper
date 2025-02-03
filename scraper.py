@@ -7,6 +7,7 @@ import time
 import re
 import json
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def debug_pagination(url):
     options = webdriver.ChromeOptions()
@@ -70,6 +71,7 @@ def get_listing_details(input_html_filename):
 
         # Extract bedroom count
         bedroom_count = "N/A"
+        bathroom_count = "N/A"
         listing_spec_mini = listing.find_next("div", class_="listing-spec-mini")
         
         if listing_spec_mini:
@@ -167,3 +169,64 @@ def fetch_sold_listings(url, num_pages=3):
 
 def clean_price(price):
     return float(str(price).replace('$', '').replace(',', ''))
+
+# Function to categorize bedrooms
+def categorize_bedrooms(bedroom):
+    if pd.isna(bedroom) or bedroom in ["N/A", ""]:
+        return bedroom  # Keep as-is for missing data
+    
+    # Extract the first number from the bedroom string
+    numbers = re.findall(r'\d+', str(bedroom))
+    if numbers:
+        first_number = int(numbers[0])  # Only consider the first number
+        return "3+" if first_number >= 3 else bedroom  # Change only if 3 or greater
+
+    return bedroom  # Keep original if no valid number is found
+
+def save_table_as_image(df, filename, col_widths=None, font_size=12, header_font_size=13, fig_width=14):
+    """
+    Save a pandas DataFrame as a formatted image.
+
+    Args:
+        df (DataFrame): The DataFrame to display.
+        filename (str): The output image filename (e.g., 'table.png').
+        col_widths (list, optional): List of custom column widths. If None, auto-calculated.
+        font_size (int): Font size for table content.
+        header_font_size (int): Font size for header row.
+        fig_width (int): Width of the figure for the table.
+    """
+    num_columns = len(df.columns)
+
+    # Auto-calculate column widths if not provided
+    if col_widths is None:
+        col_widths = [1 / num_columns] * num_columns  # Equal width for all columns
+
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(fig_width, len(df) * 0.6))
+    ax.axis('off')  # Hide axes
+
+    # Create the table
+    table = ax.table(
+        cellText=df.values,
+        colLabels=df.columns,
+        loc='center',
+        cellLoc='center',
+        colLoc='center'
+    )
+
+    # Adjust font sizes
+    table.auto_set_font_size(False)
+    table.set_fontsize(font_size)
+    table.scale(1.3, 1.4)  # Adjust scaling for better fit
+
+    # Apply column widths dynamically
+    for key, cell in table.get_celld().items():
+        cell.set_text_props(ha='center', va='center')
+        if key[0] == 0:  # Header row
+            cell.set_fontsize(header_font_size)
+        if key[1] < len(col_widths):
+            cell.set_width(col_widths[key[1]])
+
+    # Save as a high-resolution image
+    plt.savefig(filename, bbox_inches='tight', dpi=300)
+    plt.close()  # Close the figure to free up memory
