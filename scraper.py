@@ -89,6 +89,7 @@ def get_listing_details(input_html_filename):
         
         # Extract postal code for each specific listing
         postal_code = "N/A"
+        listing_url = "N/A"
         script_tag = listing.find_next("script", class_="hs-script-home-struct")
 
         if script_tag:
@@ -96,6 +97,8 @@ def get_listing_details(input_html_filename):
                 json_data = json.loads(script_tag.string)
                 if "address" in json_data and "postalCode" in json_data["address"]:
                     postal_code = json_data["address"]["postalCode"]
+                if "url" in json_data:  # ✅ Extracting the URL
+                    listing_url = json_data["url"]
             except json.JSONDecodeError:
                 print("Error decoding JSON from script tag")
 
@@ -107,7 +110,8 @@ def get_listing_details(input_html_filename):
             "Unit Type": type_text,
             "Bedrooms": bedroom_count,
             "Bathrooms": bathroom_count,
-            "Postal Code": postal_code
+            "Postal Code": postal_code,
+            "Listing URL": listing_url
         })
 
     # Convert data to DataFrame
@@ -230,3 +234,28 @@ def save_table_as_image(df, filename, col_widths=None, font_size=12, header_font
     # Save as a high-resolution image
     plt.savefig(filename, bbox_inches='tight', dpi=300)
     plt.close()  # Close the figure to free up memory
+
+# function to extract data from listing URL
+def save_listing_url_html(driver, url, output_filename):
+    """
+    Access a HouseSigma listing URL using an active Selenium session
+    and save the full HTML content to a file for inspection.
+
+    Args:
+        driver: Selenium WebDriver instance (with an active logged-in session).
+        url: Listing URL to extract data from.
+        output_filename: Filename to save the HTML content.
+    """
+    try:
+        driver.get(url)
+        print(f"\n🚀 Accessing: {url}")
+        time.sleep(5)  # Wait for the page to fully load
+
+        # ✅ Save the entire HTML content
+        with open(output_filename, "w", encoding="utf-8") as file:
+            file.write(driver.page_source)
+
+        print(f"✅ HTML content saved to '{output_filename}'\n" + "-" * 50)
+
+    except Exception as e:
+        print(f"❌ Error accessing {url}: {e}")
