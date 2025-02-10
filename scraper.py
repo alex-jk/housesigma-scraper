@@ -236,7 +236,7 @@ def save_table_as_image(df, filename, col_widths=None, font_size=12, header_font
     plt.close()  # Close the figure to free up memory
 
 # function to extract data from listing URL
-def save_listing_url_html(driver, url, output_filename, unit_type):
+def save_listing_url_html(driver, url, unit_type):
     """
     Access a HouseSigma listing URL using an active Selenium session
     and save the full HTML content to a file for inspection.
@@ -244,11 +244,10 @@ def save_listing_url_html(driver, url, output_filename, unit_type):
     Args:
         driver: Selenium WebDriver instance (with an active logged-in session).
         url: Listing URL to extract data from.
-        output_filename: Filename to save the HTML content.
     """
     try:
         driver.get(url)
-        print(f"\n🚀 Accessing: {url}")
+        # print(f"\n🚀 Accessing: {url}")
         time.sleep(5)  # Wait for the page to fully load
 
         soup = BeautifulSoup(driver.page_source, "html.parser")
@@ -282,9 +281,9 @@ def save_listing_url_html(driver, url, output_filename, unit_type):
             except json.JSONDecodeError:
                 print("❌ Error decoding JSON from hs-script tag")
 
-        print(f"Unit {unit_type}   - Sold Days Ago: {days_sold_ago}")
-        print(f"   - Maintenance Fees: {maintenance_fees}")
-        print(f"   - Unit Description: {unit_description[:100]}...") # Display only the first 100 characters
+        # print(f"Unit {unit_type}   - Sold Days Ago: {days_sold_ago}")
+        # print(f"   - Maintenance Fees: {maintenance_fees}")
+        # print(f"   - Unit Description: {unit_description[:100]}...") # Display only the first 100 characters
 
         return {
             "Sold Days Ago": days_sold_ago,
