@@ -236,7 +236,7 @@ def save_table_as_image(df, filename, col_widths=None, font_size=12, header_font
     plt.close()  # Close the figure to free up memory
 
 # function to extract data from listing URL
-def save_listing_url_html(driver, url, output_filename):
+def save_listing_url_html(driver, url, output_filename, unit_type):
     """
     Access a HouseSigma listing URL using an active Selenium session
     and save the full HTML content to a file for inspection.
@@ -251,11 +251,46 @@ def save_listing_url_html(driver, url, output_filename):
         print(f"\n🚀 Accessing: {url}")
         time.sleep(5)  # Wait for the page to fully load
 
-        # ✅ Save the entire HTML content
-        with open(output_filename, "w", encoding="utf-8") as file:
-            file.write(driver.page_source)
+        soup = BeautifulSoup(driver.page_source, "html.parser")
 
-        print(f"✅ HTML content saved to '{output_filename}'\n" + "-" * 50)
+        days_sold_ago = "N/A"
+        dom_tag = soup.find("p", class_="dom")  # Looking for <p class="dom">
+        if dom_tag:
+            text = dom_tag.text.strip()
+            if " day ago" in text:
+                days_sold_ago = "1"
+            elif " days ago" in text:
+                days_sold_ago = text.replace("Sold ", "").replace(" days ago", "").strip()
+
+        # ✅ Extract Maintenance Fees (Only for Condos)
+        maintenance_fees = "N/A"
+        if "Condo" in unit_type:  # Only extract maintenance fees for condos
+            maintenance_label = soup.find("span", string="Maintenance:")
+            if maintenance_label:
+                maintenance_value = maintenance_label.find_next("span")  # Get the value after "Maintenance:"
+                if maintenance_value:
+                    maintenance_fees = maintenance_value.text.strip()
+    
+        # ✅ Extract Unit Description from JSON inside <script class="hs-script">
+        unit_description = "N/A"
+        script_tag = soup.find("script", class_="hs-script")
+        if script_tag:
+            try:
+                json_data = json.loads(script_tag.string)
+                if "description" in json_data:
+                    unit_description = json_data["description"].strip()
+            except json.JSONDecodeError:
+                print("❌ Error decoding JSON from hs-script tag")
+
+        print(f"Unit {unit_type}   - Sold Days Ago: {days_sold_ago}")
+        print(f"   - Maintenance Fees: {maintenance_fees}")
+        print(f"   - Unit Description: {unit_description[:100]}...") # Display only the first 100 characters
+
+        return {
+            "Sold Days Ago": days_sold_ago,
+            "Maintenance Fees": maintenance_fees,
+            "Unit Description": unit_description
+        }
 
     except Exception as e:
         print(f"❌ Error accessing {url}: {e}")
