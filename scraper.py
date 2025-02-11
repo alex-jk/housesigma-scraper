@@ -293,3 +293,17 @@ def save_listing_url_html(driver, url, unit_type):
 
     except Exception as e:
         print(f"❌ Error accessing {url}: {e}")
+
+# Apply function with progress tracking
+def process_with_progress(df, driver, progress_interval=100):
+    total_rows = len(df)
+
+    def process_row(row, index):
+        if index % progress_interval == 0 or index == total_rows - 1:  # Print progress every `progress_interval` rows
+            print(f"🚀 Processing row {index + 1}/{total_rows}")
+        return save_listing_url_html(driver, row["Listing URL"], row["Unit Type"])
+
+    # Use `.apply()` and track index using `enumerate()`
+    extracted_data = df.apply(lambda row: process_row(row, row.name), axis=1)
+
+    return extracted_data
