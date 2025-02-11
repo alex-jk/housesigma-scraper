@@ -307,3 +307,28 @@ def process_with_progress(df, driver, progress_interval=100):
     extracted_data = df.apply(lambda row: process_row(row, row.name), axis=1)
 
     return extracted_data
+
+# Function to calculate monthly mortgage payment
+def calculate_mortgage(sold_price, interest_rate=0.05, loan_term_years=25):
+    """
+    Calculate the monthly mortgage payment based on the loan amount,
+    interest rate, and loan term.
+    
+    Args:
+        sold_price (float): The sold price of the property.
+        interest_rate (float): The annual interest rate (default = 5%).
+        loan_term_years (int): Loan term in years (default = 25 years).
+    
+    Returns:
+        float: Monthly mortgage payment.
+    """
+    if pd.isna(sold_price):  # Handle missing values
+        return None
+    
+    loan_amount = 0.8 * sold_price  # 80% of sold price is the loan
+    months = loan_term_years * 12  # Convert loan term to months
+    monthly_rate = interest_rate / 12  # Convert annual rate to monthly
+    
+    # Mortgage payment formula
+    M = loan_amount * (monthly_rate * (1 + monthly_rate) ** months) / ((1 + monthly_rate) ** months - 1)
+    return round(M, 2)  # Round to 2 decimal places
