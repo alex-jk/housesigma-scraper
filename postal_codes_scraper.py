@@ -1,7 +1,11 @@
 import requests
-from bs4 import BeautifulSoup
 import time
 import re
+import numpy as np
+import pandas as pd
+from bs4 import BeautifulSoup
+from sklearn.base import BaseEstimator, TransformerMixin
+import pgeocode
 
 def get_lat_lon_from_geonames(postal_code_area):
     """
@@ -46,3 +50,52 @@ def get_lat_lon_from_geonames(postal_code_area):
         return lat, lon
     except ValueError:
         return None, None
+
+class PostalCodeGeocoder(BaseEstimator, TransformerMixin):
+    """
+    Minimal scikit-learn style transformer that uses pgeocode to convert
+    Canadian postal codes into latitude, longitude, place name, and province,
+    by replicating the exact simple loop approach you provided.
+    """
+    def __init__(self, postal_code_col='Postal Code Area'):
+        self.postal_code_col = postal_code_col
+        self.nomi_ = None
+
+    def fit(self, X, y=None):
+        # Just initialize pgeocode for Canada once.
+        self.nomi_ = pgeocode.Nominatim('ca')
+        return self
+
+    def transform(self, X):
+        # Make a copy so as not to modify the original DataFrame
+        X_transformed = X.copy()
+        
+        # Prepare lists to hold the new column values
+        lat_list = []
+        lon_list = []
+        place_list = []
+        province_list = []
+        
+        # Exactly like your working loop
+        for pc in X_transformed[self.postal_code_col]:
+            result = self.nomi_.query_postal_code(pc)
+            # If pgeocode returns a valid Series, extract its fields;
+            # otherwise, store None for that row.
+            if result is not None and not result.isnull().all():
+                lat_list.append(result.latitude)
+                lon_list.append(result.longitude)
+                place_list.append(result.place_name)
+                province_list.append(result.state_name)
+            else:
+                lat_list.append(None)
+                lon_list.append(None)
+                place_list.append(None)
+                province_list.append(None)
+        
+        # Add the new columns to the DataFrame
+        X_transformed['Latitude'] = lat_list
+        X_transformed['Longitude'] = lon_list
+        X_transformed['Place'] = place_list
+        X_transformed['Province'] = province_list
+        
+        return X_transformed
