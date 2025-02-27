@@ -6,6 +6,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from sklearn.base import BaseEstimator, TransformerMixin
 import pgeocode
+from geopy.distance import geodesic
 
 def get_lat_lon_from_geonames(postal_code_area):
     """
@@ -53,49 +54,73 @@ def get_lat_lon_from_geonames(postal_code_area):
 
 class PostalCodeGeocoder(BaseEstimator, TransformerMixin):
     """
-    Minimal scikit-learn style transformer that uses pgeocode to convert
-    Canadian postal codes into latitude, longitude, place name, and province,
-    by replicating the exact simple loop approach you provided.
+    Scikit-learn style transformer that converts Canadian postal codes into latitude, longitude,
+    and calculates distances to specific locations using the Haversine formula.
     """
     def __init__(self, postal_code_col='Postal Code Area'):
         self.postal_code_col = postal_code_col
         self.nomi_ = None
+        self.locations = [
+            (43.77972166228427, -79.41577970909104), # Yonge & Finch
+            (43.744946273470774, -79.48573172067134), # Keele & Sheppard
+            (43.707544839260656, -79.3967682130005), # Yonge & Eglinton
+            (43.69848559097772, -79.43710863540463), # Eglinton & Allen Road
+            (43.68639927115253, -79.40213796153654), # Bloor & Avenue
+            (43.645576441425234, -79.38164588495839) # Union Station
+        ]
 
     def fit(self, X, y=None):
-        # Just initialize pgeocode for Canada once.
         self.nomi_ = pgeocode.Nominatim('ca')
         return self
 
     def transform(self, X):
-        # Make a copy so as not to modify the original DataFrame
         X_transformed = X.copy()
         
-        # Prepare lists to hold the new column values
         lat_list = []
         lon_list = []
-        place_list = []
-        province_list = []
+        distance_lists = [[] for _ in range(len(self.locations))]
         
-        # Exactly like your working loop
         for pc in X_transformed[self.postal_code_col]:
             result = self.nomi_.query_postal_code(pc)
-            # If pgeocode returns a valid Series, extract its fields;
-            # otherwise, store None for that row.
             if result is not None and not result.isnull().all():
-                lat_list.append(result.latitude)
-                lon_list.append(result.longitude)
-                place_list.append(result.place_name)
-                province_list.append(result.state_name)
+                lat, lon = result.latitude, result.longitude
+                lat_list.append(lat)
+                lon_list.append(lon)
+                
+                for i, loc in enumerate(self.locations):
+                    if lat is not None and lon is not None:
+                        distance = geodesic((lat, lon), loc).km
+                    else:
+                        distance = None
+                    distance_lists[i].append(distance)
             else:
                 lat_list.append(None)
                 lon_list.append(None)
-                place_list.append(None)
-                province_list.append(None)
+                for i in range(len(self.locations)):
+                    distance_lists[i].append(None)
         
-        # Add the new columns to the DataFrame
         X_transformed['Latitude'] = lat_list
         X_transformed['Longitude'] = lon_list
-        X_transformed['Place'] = place_list
-        X_transformed['Province'] = province_list
         
+        for i, loc in enumerate(self.locations):
+            X_transformed[f'Distance_to_Location_{i+1}'] = distance_lists[i]
+        
+        return X_transformed
+
+# transformer for Unit Type column
+class UnitTypeEncoder(BaseEstimator, TransformerMixin):
+    """
+    Scikit-learn transformer that converts categorical 'Unit Type' column into dummy variables (one-hot encoding).
+    """
+    def __init__(self, unit_type_col='Unit Type'):
+        self.unit_type_col = unit_type_col
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X_transformed = X.copy()
+        dummies = pd.get_dummies(X_transformed[self.unit_type_col], prefix=self.unit_type_col)
+        X_transformed = pd.concat([X_transformed, dummies], axis=1)
+        X_transformed.drop(columns=[self.unit_type_col], inplace=True)
         return X_transformed
