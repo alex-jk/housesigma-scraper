@@ -124,3 +124,27 @@ class UnitTypeEncoder(BaseEstimator, TransformerMixin):
         X_transformed = pd.concat([X_transformed, dummies], axis=1)
         X_transformed.drop(columns=[self.unit_type_col], inplace=True)
         return X_transformed
+
+class BedroomSplitter(BaseEstimator, TransformerMixin):
+    """
+    Scikit-learn transformer that splits the 'Bedrooms' column into 'Main_Bedrooms' and 'Extra_Bedrooms'.
+    """
+    def __init__(self, bedroom_col='Bedrooms'):
+        self.bedroom_col = bedroom_col
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        X_transformed = X.copy()
+        
+        def split_bedrooms(bedroom_str):
+            parts = bedroom_str.split("+")
+            main_bedrooms = int(parts[0])  # First number is main bedrooms
+            extra_bedrooms = int(parts[1]) if len(parts) > 1 else 0  # Second number (if exists) is extra space
+            return main_bedrooms, extra_bedrooms
+
+        X_transformed[['Main_Bedrooms', 'Extra_Bedrooms']] = X_transformed[self.bedroom_col].astype(str).apply(lambda x: pd.Series(split_bedrooms(x)))
+        # X_transformed.drop(columns=[self.bedroom_col], inplace=True)
+        
+        return X_transformed
