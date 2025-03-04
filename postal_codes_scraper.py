@@ -9,6 +9,16 @@ import pgeocode
 from geopy.distance import geodesic
 from sklearn.decomposition import NMF
 from sklearn.feature_extraction.text import TfidfVectorizer
+import matplotlib.pyplot as plt
+
+import nltk
+from nltk.corpus import stopwords
+
+# Download stopwords only if not already present
+try:
+    stopwords.words('english')
+except LookupError:
+    nltk.download('stopwords')
 
 def get_lat_lon_from_geonames(postal_code_area):
     """
@@ -151,6 +161,37 @@ class BedroomSplitter(BaseEstimator, TransformerMixin):
         
         return X_transformed
 
+def find_best_num_topics(X, text_col, max_topics=10):
+    """
+    Finds the optimal number of topics by checking reconstruction error.
+    """
+    tfidf_vectorizer = TfidfVectorizer(
+        max_features=500,
+        stop_words='english',
+        ngram_range=(1,3),
+        token_pattern=r"(?u)\b\w[\w']+\b",  # Keeps words + contractions (like don't, can't)
+        sublinear_tf=True,
+        min_df=2
+    )
+    tfidf_matrix = tfidf_vectorizer.fit_transform(X[text_col])
+
+    errors = []
+    topics_range = range(2, max_topics + 1)  # Try 2 to max_topics
+
+    for num_topics in topics_range:
+        nmf_model = NMF(n_components=num_topics, random_state=42)
+        nmf_model.fit(tfidf_matrix)
+        error = nmf_model.reconstruction_err_
+        errors.append(error)
+
+    # Plot error vs. number of topics
+    plt.figure(figsize=(8,5))
+    plt.plot(topics_range, errors, marker='o', linestyle='-')
+    plt.xlabel("Number of Topics")
+    plt.ylabel("Reconstruction Error")
+    plt.title("Choosing the Best Number of Topics")
+    plt.show()
+
 class NMFTopicExtractor(BaseEstimator, TransformerMixin):
     """
     Scikit-learn transformer that extracts topics from text data using NMF.
@@ -161,18 +202,33 @@ class NMFTopicExtractor(BaseEstimator, TransformerMixin):
         self.max_features = max_features
         self.tfidf_vectorizer = None
         self.nmf_model = None
+        self.custom_stopwords = set(stopwords.words('english')).union({"just"})
+
+    def custom_preprocessor(self, text):
+        text = text.lower()  # Convert to lowercase
+        text = re.sub(r'\b\d+\b', '', text)  # Remove standalone numbers like "24"
+        return text
 
     def fit(self, X, y=None):
-        self.tfidf_vectorizer = TfidfVectorizer(max_features=self.max_features, stop_words='english', ngram_range=(1,3))
+        self.tfidf_vectorizer = TfidfVectorizer(
+            max_features=self.max_features,
+            stop_words=list(self.custom_stopwords),  # Use custom stopwords
+            ngram_range=(1,3),
+            token_pattern=r"(?u)\b\w[\w']+\b",  # Keeps words + contractions (like don't, can't)
+            sublinear_tf=True,
+            min_df=2,
+            preprocessor=self.custom_preprocessor  # Custom function to remove numbers
+        )
         tfidf_matrix = self.tfidf_vectorizer.fit_transform(X[self.text_col])
         
         self.nmf_model = NMF(n_components=self.num_topics, random_state=42)
         self.nmf_model.fit(tfidf_matrix)
         
-        # Print top words per topic
+        # Print top words for each topic with weights rounded to 2 decimal places, removing np.float64 formatting
         feature_names = self.tfidf_vectorizer.get_feature_names_out()
         for topic_idx, topic in enumerate(self.nmf_model.components_):
-            top_words = [feature_names[i] for i in topic.argsort()[:-11 - 1:-1]]  # Get top 10 words
+            top_word_indices = topic.argsort()[:-11 - 1:-1]  # Get top 10 words
+            top_words = [(feature_names[i], format(topic[i], ".2f")) for i in top_word_indices]  # Format weights
             print(f"Topic {topic_idx + 1}: {top_words}")
         
         return self
@@ -182,7 +238,8 @@ class NMFTopicExtractor(BaseEstimator, TransformerMixin):
         topic_distributions = self.nmf_model.transform(tfidf_matrix)
         
         topic_features = pd.DataFrame(topic_distributions, columns=[f'Topic_{i+1}' for i in range(self.num_topics)], index=X.index)
+
         X_transformed = pd.concat([X, topic_features], axis=1)
-        
         X_transformed.drop(columns=[self.text_col], inplace=True)
+
         return X_transformed
