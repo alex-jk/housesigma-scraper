@@ -7,6 +7,8 @@ from bs4 import BeautifulSoup
 from sklearn.base import BaseEstimator, TransformerMixin
 import pgeocode
 from geopy.distance import geodesic
+from sklearn.decomposition import NMF
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 def get_lat_lon_from_geonames(postal_code_area):
     """
@@ -147,4 +149,40 @@ class BedroomSplitter(BaseEstimator, TransformerMixin):
         X_transformed[['Main_Bedrooms', 'Extra_Bedrooms']] = X_transformed[self.bedroom_col].astype(str).apply(lambda x: pd.Series(split_bedrooms(x)))
         # X_transformed.drop(columns=[self.bedroom_col], inplace=True)
         
+        return X_transformed
+
+class NMFTopicExtractor(BaseEstimator, TransformerMixin):
+    """
+    Scikit-learn transformer that extracts topics from text data using NMF.
+    """
+    def __init__(self, text_col='Unit Description', num_topics=5, max_features=500):
+        self.text_col = text_col
+        self.num_topics = num_topics
+        self.max_features = max_features
+        self.tfidf_vectorizer = None
+        self.nmf_model = None
+
+    def fit(self, X, y=None):
+        self.tfidf_vectorizer = TfidfVectorizer(max_features=self.max_features, stop_words='english', ngram_range=(1,3))
+        tfidf_matrix = self.tfidf_vectorizer.fit_transform(X[self.text_col])
+        
+        self.nmf_model = NMF(n_components=self.num_topics, random_state=42)
+        self.nmf_model.fit(tfidf_matrix)
+        
+        # Print top words per topic
+        feature_names = self.tfidf_vectorizer.get_feature_names_out()
+        for topic_idx, topic in enumerate(self.nmf_model.components_):
+            top_words = [feature_names[i] for i in topic.argsort()[:-11 - 1:-1]]  # Get top 10 words
+            print(f"Topic {topic_idx + 1}: {top_words}")
+        
+        return self
+
+    def transform(self, X):
+        tfidf_matrix = self.tfidf_vectorizer.transform(X[self.text_col])
+        topic_distributions = self.nmf_model.transform(tfidf_matrix)
+        
+        topic_features = pd.DataFrame(topic_distributions, columns=[f'Topic_{i+1}' for i in range(self.num_topics)], index=X.index)
+        X_transformed = pd.concat([X, topic_features], axis=1)
+        
+        X_transformed.drop(columns=[self.text_col], inplace=True)
         return X_transformed
