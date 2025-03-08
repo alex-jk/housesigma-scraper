@@ -98,7 +98,11 @@ class PostalCodeGeocoder(BaseEstimator, TransformerMixin):
                 lat, lon = result.latitude, result.longitude
                 lat_list.append(lat)
                 lon_list.append(lon)
-                
+
+                # Log missing values
+                if lat is None or lon is None or np.isnan(lat) or np.isnan(lon):
+                    print(f"Warning: Missing coordinates for postal code '{pc}' at index {idx}")
+               
                 for i, loc in enumerate(self.locations):
                     if lat is not None and lon is not None:
                         distance = geodesic((lat, lon), loc).km
